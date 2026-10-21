@@ -1,0 +1,11 @@
+{
+  "identities": [
+    {
+      "name": "fitness_app",
+      "credentials": [
+        { "accessKey": "fitness_dev_access", "secretKey": "fitness_dev_secret_change_me" }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

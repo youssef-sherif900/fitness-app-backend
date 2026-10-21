@@ -1,0 +1,64 @@
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+!.env.testing.example
+
+# Dependencies
+/vendor/
+/node_modules/
+
+# Laravel generated files
+/public/build/
+/public/hot
+/public/storage
+/storage/*.key
+
+# Logs
+/storage/logs/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/bootstrap/cache/*.php
+
+# Testing and coverage
+/.phpunit.cache/
+/coverage/
+/.phpunit.result.cache
+
+# IDEs and editors
+/.idea/
+/.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Local development tools
+/.phpstorm.meta.php
+.phpunit-watcher.yml
+
+# Composer
+/auth.json
+
+# Debugging and temporary files
+*.log
+*.tmp
+*.bak
+
+# Docker local overrides
+docker-compose.override.yml
+
+# SQLite local database
+/database/*.sqlite
+/database/*.sqlite3
+
+# Laravel Octane / runtime files
+/storage/runtime/
+
+# Local scripts and environment-specific files
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
