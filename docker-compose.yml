@@ -43,7 +43,7 @@ services:
       - ./docker/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
     ports: [ "${S3_PORT:-8333}:8333" ]
     healthcheck:
-      test: [ "CMD-SHELL", "wget -q --spider http://localhost:9333/cluster/status || exit 1" ]
+      test: [ "CMD-SHELL", "wget -q --spider http://127.0.0.1:9333/cluster/status || exit 1" ]
       interval: 5s
       timeout: 3s
       retries: 30

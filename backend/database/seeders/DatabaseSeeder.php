@@ -106,29 +106,40 @@ class DatabaseSeeder extends Seeder
         }
     }
 
+
     private function exercises(): void
     {
         $rows = [
-            ['Barbell Back Squat', ['quads', 'glutes'], 'barbell'],
-            ['Bench Press', ['chest', 'triceps'], 'barbell'],
-            ['Deadlift', ['hamstrings', 'back', 'glutes'], 'barbell'],
-            ['Overhead Press', ['shoulders', 'triceps'], 'barbell'],
-            ['Pull-up', ['back', 'biceps'], 'bodyweight'],
-            ['Dumbbell Row', ['back', 'biceps'], 'dumbbell'],
-            ['Romanian Deadlift', ['hamstrings', 'glutes'], 'barbell'],
-            ['Plank', ['core'], 'bodyweight'],
+            ['Barbell Back Squat', ['quads', 'glutes'], [], ['barbell']],
+            ['Bench Press', ['chest'], ['triceps'], ['barbell']],
+            ['Deadlift', ['hamstrings', 'glutes'], ['back'], ['barbell']],
+            ['Overhead Press', ['shoulders'], ['triceps'], ['barbell']],
+            ['Pull-up', ['back'], ['biceps'], ['bodyweight']],
+            ['Dumbbell Row', ['back'], ['biceps'], ['dumbbell']],
+            ['Romanian Deadlift', ['hamstrings', 'glutes'], ['back'], ['barbell']],
+            ['Plank', ['core'], [], ['bodyweight']],
         ];
-        foreach ($rows as [$name, $muscles, $equipment]) {
-            if (!DB::table('exercises')->whereNull('owner_id')->where('name', $name)->exists()) {
+
+        foreach ($rows as [$name, $primaryMuscles, $secondaryMuscles, $equipment]) {
+            if (
+                !DB::table('exercises')
+                    ->whereNull('owner_id')
+                    ->where('name', $name)
+                    ->exists()
+            ) {
                 DB::table('exercises')->insert([
                     'id' => (string) Str::uuid(),
+                    'owner_id' => null,
                     'name' => $name,
-                    'muscles' => json_encode($muscles),
-                    'equipment' => $equipment,
+                    'primary_muscles' => json_encode($primaryMuscles),
+                    'secondary_muscles' => json_encode($secondaryMuscles),
+                    'equipment' => json_encode($equipment),
+                    'is_public' => true,
                     'created_at' => now(),
-                    'updated_at' => now()
+                    'updated_at' => now(),
                 ]);
             }
         }
     }
+
 }
