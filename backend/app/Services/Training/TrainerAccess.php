@@ -1,5 +1,5 @@
 <?php
-namespace App\Services;
+namespace App\Services\Training;
 
 use App\Models\Program;
 use App\Models\User;

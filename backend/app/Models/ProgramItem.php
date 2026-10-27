@@ -12,6 +12,11 @@ class ProgramItem extends Model
     protected $appends = ['rep_range'];
     protected $casts = ['progression_rule' => 'array', 'target_rpe' => 'float', 'weight_kg' => 'float'];
 
+    public function exercise()
+    {
+        return $this->belongsTo(Exercise::class);
+    }
+
     public function getRepRangeAttribute(): array
     {
         return ['min' => $this->rep_min, 'max' => $this->rep_max];

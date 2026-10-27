@@ -3,8 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\Food;
+use App\Models\Program;
 use App\Models\User;
 use App\Services\Nutrition\TargetService;
+use App\Services\Training\ProgramService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -35,7 +37,62 @@ class DatabaseSeeder extends Seeder
         DB::table('conversations')->updateOrInsert(['link_id' => $linkA], ['id' => (string) Str::uuid(), 'created_at' => now(), 'updated_at' => now()]);
 
         $this->foods();
-        $this->exercises();
+        $this->call([
+            ExerciseSeeder::class,
+            ProgramTemplateSeeder::class,
+        ]);
+        $this->demoProgram($alice);
+    }
+
+    /**
+     * Give the demo client an active program so the Training tab has a
+     * populated state as well as the empty state.
+     */
+    private function demoProgram(User $client): void
+    {
+        if (Program::where('owner_id', $client->id)->where('is_template', false)->exists()) {
+            return;
+        }
+
+        $template = Program::where('is_template', true)
+            ->where('name', 'Push Pull Legs — 3 Day')
+            ->with('days.items')
+            ->first();
+
+        if (!$template) {
+            return;
+        }
+
+        $program = Program::create([
+            'owner_id' => $client->id,
+            'name' => 'My Push Pull Legs',
+            'description' => $template->description,
+            'goal' => $template->goal,
+            'experience_level' => $template->experience_level,
+            'days_per_week' => $template->days_per_week,
+            'status' => 'draft',
+            'version' => 1,
+        ]);
+
+        foreach ($template->days as $day) {
+            $copyDay = $program->days()->create([
+                'name' => $day->name,
+                'day_number' => $day->day_number,
+            ]);
+
+            foreach ($day->items as $item) {
+                $copyDay->items()->create($item->only([
+                    'exercise_id',
+                    'position',
+                    'sets',
+                    'rep_min',
+                    'rep_max',
+                    'rest_seconds',
+                ]));
+            }
+        }
+
+        app(ProgramService::class)->publish($program);
     }
 
     private function user(string $email, string $name, array $extra = []): User
@@ -103,42 +160,6 @@ class DatabaseSeeder extends Seeder
         $banana = Food::where('name', 'Banana')->whereNull('owner_id')->first();
         if ($banana && !$banana->barcode) {
             $banana->update(['barcode' => '4011100000014']); // fake barcode for demos
-        }
-    }
-
-
-    private function exercises(): void
-    {
-        $rows = [
-            ['Barbell Back Squat', ['quads', 'glutes'], [], ['barbell']],
-            ['Bench Press', ['chest'], ['triceps'], ['barbell']],
-            ['Deadlift', ['hamstrings', 'glutes'], ['back'], ['barbell']],
-            ['Overhead Press', ['shoulders'], ['triceps'], ['barbell']],
-            ['Pull-up', ['back'], ['biceps'], ['bodyweight']],
-            ['Dumbbell Row', ['back'], ['biceps'], ['dumbbell']],
-            ['Romanian Deadlift', ['hamstrings', 'glutes'], ['back'], ['barbell']],
-            ['Plank', ['core'], [], ['bodyweight']],
-        ];
-
-        foreach ($rows as [$name, $primaryMuscles, $secondaryMuscles, $equipment]) {
-            if (
-                !DB::table('exercises')
-                    ->whereNull('owner_id')
-                    ->where('name', $name)
-                    ->exists()
-            ) {
-                DB::table('exercises')->insert([
-                    'id' => (string) Str::uuid(),
-                    'owner_id' => null,
-                    'name' => $name,
-                    'primary_muscles' => json_encode($primaryMuscles),
-                    'secondary_muscles' => json_encode($secondaryMuscles),
-                    'equipment' => json_encode($equipment),
-                    'is_public' => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
         }
     }
 

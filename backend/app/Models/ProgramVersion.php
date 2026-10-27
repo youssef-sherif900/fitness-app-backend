@@ -9,5 +9,10 @@ class ProgramVersion extends Model
     use HasUuids;
     public $timestamps = false;
     protected $guarded = [];
-    protected $casts = ['snapshot' => 'array', 'published_at' => 'datetime'];
+    protected $casts = ['metadata' => 'array', 'published_at' => 'datetime'];
+
+    public function program()
+    {
+        return $this->belongsTo(Program::class);
+    }
 }

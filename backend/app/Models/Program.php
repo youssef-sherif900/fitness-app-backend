@@ -24,7 +24,7 @@ class Program extends Model
         return $q->where('is_template', false)->where(function ($w) use ($u) {
             $w->where('owner_id', $u->id)->orWhereIn(
                 'id',
-                ProgramAssignment::select('program_id')->where('assigned_to', $u->id)->whereIn('status', ['active', 'paused'])
+                ProgramAssignment::select('program_id')->where('client_id', $u->id)->whereIn('status', ['active', 'paused'])
             );
         });
     }

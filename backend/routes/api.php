@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\ProgressionController;
 use App\Http\Controllers\Api\WorkoutController;
 use App\Http\Controllers\Api\WorkoutSetController;
 use App\Http\Controllers\Api\ProgressController;
+use App\Http\Controllers\Api\TrainerClientController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -67,6 +68,8 @@ Route::prefix('v1')->group(function () {
 
         Route::post('attachments', [AttachmentController::class, 'store'])->middleware('throttle:uploads');
 
+        // Trainer clients
+        Route::get('trainer/clients', [TrainerClientController::class, 'index']);
 
 
         // Exercises

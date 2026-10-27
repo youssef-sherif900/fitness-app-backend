@@ -2,9 +2,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Program, ProgramAssignment};
+use App\Models\{Program, ProgramAssignment, ProgramVersion};
 use App\Services\Training\ProgramService;
-use App\Services\TrainerAccess;
+use App\Services\Training\TrainerAccess;
 use App\Support\{ApiException, ApiResponse};
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
@@ -34,7 +34,7 @@ class ProgramController extends Controller
     {
         $u = $r->user();
         $r->validate(['status' => ['nullable', Rule::in(['draft', 'active', 'archived'])], 'scope' => ['nullable', Rule::in(['mine', 'assigned', 'all'])]]);
-        $assigned = fn() => Program::whereIn('id', ProgramAssignment::select('program_id')->where('assigned_to', $u->id)->whereIn('status', ['active', 'paused']));
+        $assigned = fn() => Program::whereIn('id', ProgramAssignment::select('program_id')->where('client_id', $u->id)->whereIn('status', ['active', 'paused']));
         $q = match ($r->query('scope', 'mine')) {
             'assigned' => $assigned(),
             'all' => Program::visibleTo($u),
@@ -126,7 +126,7 @@ class ProgramController extends Controller
                 \App\Models\Exercise::whereNull('owner_id')->whereJsonContains('equipment', $eq)->select('id')
             ));
         }
-        return ApiResponse::page($q->orderBy('name')->orderBy('id')->cursorPaginate(ApiResponse::perPage($r)));
+        return ApiResponse::page($q->withCount('days')->orderBy('name')->orderBy('id')->cursorPaginate(ApiResponse::perPage($r)));
     }
 
     public function copyTemplate(Request $r, string $templateId)
@@ -163,35 +163,97 @@ class ProgramController extends Controller
     public function assign(Request $r, string $programId)
     {
         $u = $r->user();
-        $d = $r->validate(['client_id' => ['required', 'uuid'], 'start_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:today']]);
-        $p = $this->svc->owned($u, $programId);
-        if ($p->status !== 'active' || !$p->published_version)
-            throw new ApiException('INVALID_STATE', 'Publish the program before assigning it.');
 
-        if ($d['client_id'] !== $u->id && !app(TrainerAccess::class)->canAssignTo($u, $d['client_id'])) {
-            abort(404); // non-disclosure
+        $d = $r->validate([
+            'client_id' => ['required', 'uuid'],
+            'start_date' => [
+                'required',
+                'date_format:Y-m-d',
+                'after_or_equal:today',
+            ],
+        ]);
+
+        $p = $this->svc->owned($u, $programId);
+
+        if ($p->status !== 'active' || !$p->published_version) {
+            throw new ApiException(
+                'INVALID_STATE',
+                'Publish the program before assigning it.'
+            );
         }
-        $a = DB::transaction(function () use ($p, $d, $u) {
-            ProgramAssignment::where('assigned_to', $d['client_id'])->where('status', 'active')->update(['status' => 'cancelled']);
+
+        if (
+            $d['client_id'] !== $u->id &&
+            !app(TrainerAccess::class)->canAssignTo($u, $d['client_id'])
+        ) {
+            abort(404);
+        }
+
+        $version = ProgramVersion::where('program_id', $p->id)
+            ->where('version_number', $p->published_version)
+            ->first();
+        if (!$version) {
+            throw new ApiException('INVALID_STATE', 'Publish the program again before assigning it.');
+        }
+
+        $a = DB::transaction(function () use ($p, $d, $u, $version) {
+            // Cancel the client's existing active assignment.
+            ProgramAssignment::where('client_id', $d['client_id'])
+                ->where('status', 'active')
+                ->update(['status' => 'cancelled']);
+
             return ProgramAssignment::create([
                 'program_id' => $p->id,
-                'program_version' => $p->published_version,
-                'assigned_to' => $d['client_id'],
-                'assigned_by' => $u->id,
-                'start_date' => $d['start_date'],
+                'program_version_id' => $version->id,
+                'client_id' => $d['client_id'],
+                'trainer_id' => $u->id,
+                'starts_on' => $d['start_date'],
                 'status' => 'active',
             ]);
         });
+
         return ApiResponse::one($a, 201);
     }
-
+    /**
+     * The active program for this user.
+     *
+     * A coach assignment wins. Otherwise the most recently updated active program
+     * owned by the user is returned, which is what a self-started program becomes
+     * after publish(). This keeps "Save" then "Start this program" working without
+     * creating a fake trainer assignment.
+     */
     public function current(Request $r)
     {
-        $a = ProgramAssignment::where('assigned_to', $r->user()->id)->where('status', 'active')->latest()->first();
-        if (!$a)
+        $u = $r->user();
+        $a = ProgramAssignment::where('client_id', $u->id)->where('status', 'active')->latest()->first();
+
+        if ($a) {
+            $program = Program::with('days.items.exercise')->find($a->program_id);
+            $snap = ProgramVersion::where('id', $a->program_version_id)->value('metadata');
+            return ApiResponse::one([
+                'assignment' => $a,
+                'program' => $program,
+                'days' => $program?->days ?? [],
+                'program_snapshot' => $snap,
+            ]);
+        }
+
+        $program = Program::with('days.items.exercise')
+            ->where('owner_id', $u->id)
+            ->where('is_template', false)
+            ->where('status', 'active')
+            ->latest('updated_at')
+            ->first();
+
+        if (!$program)
             return ApiResponse::one(null);
-        $snap = \App\Models\ProgramVersion::where('program_id', $a->program_id)->where('version', $a->program_version)->value('snapshot');
-        return ApiResponse::one(array_merge($a->toArray(), ['program_snapshot' => $snap]));
+
+        return ApiResponse::one([
+            'assignment' => null,
+            'program' => $program,
+            'days' => $program->days,
+            'program_snapshot' => $this->svc->snapshotArray($program),
+        ]);
     }
 
     public function assignments(Request $r, string $programId)
@@ -206,7 +268,7 @@ class ProgramController extends Controller
         $a = ProgramAssignment::findOrFail($assignmentId);
         $u = $r->user();
         $prog = Program::findOrFail($a->program_id);
-        $mayManage = $a->assigned_to === $u->id || $prog->owner_id === $u->id || app(TrainerAccess::class)->canEditPlan($u, $prog);
+        $mayManage = $a->client_id === $u->id || $prog->owner_id === $u->id || app(TrainerAccess::class)->canEditPlan($u, $prog);
         if (!$mayManage)
             abort(404);
 
@@ -215,7 +277,7 @@ class ProgramController extends Controller
             throw new ApiException('INVALID_STATE', "Cannot change assignment from {$a->status} to {$d['status']}.");
         }
         if ($d['status'] === 'active') {
-            ProgramAssignment::where('assigned_to', $a->assigned_to)->where('status', 'active')->update(['status' => 'cancelled']);
+            ProgramAssignment::where('client_id', $a->client_id)->where('status', 'active')->update(['status' => 'cancelled']);
         }
         $a->update($d);
         return ApiResponse::one($a->fresh());

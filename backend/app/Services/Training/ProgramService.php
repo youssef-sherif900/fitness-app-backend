@@ -119,12 +119,12 @@ class ProgramService
 
     public function full(Program $p): Program
     {
-        return $p->load('days.items');
+        return $p->load('days.items.exercise');
     }
 
     public function snapshotArray(Program $p): array
     {
-        $p->load('days.items');
+        $p->load('days.items.exercise');
         return [
             'program' => $p->only(['id', 'name', 'description', 'goal', 'experience_level', 'days_per_week']),
             'version' => $p->version,
@@ -142,8 +142,8 @@ class ProgramService
         }
         return DB::transaction(function () use ($p) {
             $v = ProgramVersion::firstOrCreate(
-                ['program_id' => $p->id, 'version' => $p->version],
-                ['snapshot' => $this->snapshotArray($p), 'published_at' => now()]
+                ['program_id' => $p->id, 'version_number' => $p->version],
+                ['metadata' => $this->snapshotArray($p), 'status' => 'published', 'published_at' => now()]
             );
             $p->update(['status' => 'active', 'published_version' => $p->version]);
             return $v;

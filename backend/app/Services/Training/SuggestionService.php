@@ -15,16 +15,20 @@ class SuggestionService
             $p = Program::visibleTo($u)->find($programId);
             if (!$p)
                 return null;
-            $a = ProgramAssignment::where('assigned_to', $u->id)->where('program_id', $p->id)->where('status', 'active')->first();
-            $version = $a?->program_version ?? $p->published_version;
+            $a = ProgramAssignment::where('client_id', $u->id)->where('program_id', $p->id)->where('status', 'active')->first();
+            $version = $a?->program_version_id
+                ? ProgramVersion::whereKey($a->program_version_id)->value('version_number')
+                : $p->published_version;
         } else {
-            $a = ProgramAssignment::where('assigned_to', $u->id)->where('status', 'active')->latest()->first();
+            $a = ProgramAssignment::where('client_id', $u->id)->where('status', 'active')->latest()->first();
             if (!$a)
                 return null;
             $programId = $a->program_id;
-            $version = $a->program_version;
+            $version = $a->program_version_id
+                ? ProgramVersion::whereKey($a->program_version_id)->value('version_number')
+                : Program::whereKey($programId)->value('published_version');
         }
-        return $version ? ProgramVersion::where('program_id', $programId)->where('version', $version)->value('snapshot') : null;
+        return $version ? ProgramVersion::where('program_id', $programId)->where('version_number', $version)->value('metadata') : null;
     }
 
     private function prescription(User $u, string $exerciseId, ?string $programId, ?string $dayId): ?array
