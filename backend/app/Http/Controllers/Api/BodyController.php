@@ -63,9 +63,31 @@ class BodyController extends Controller
         return response()->json(['data' => $w], 201);
     }
 
-    public function destroyWeight(Request $request, string $weight): JsonResponse
+    /** BODY-1: correct a weigh-in without losing the entry or its place in the trend. */
+    public function updateWeight(Request $request, string $weight): JsonResponse
     {
-        Weight::where('user_id', $request->user()->id)->findOrFail($weight)->delete();
+        $d = $request->validate([
+            'value_kg' => 'sometimes|numeric|between:20,500',
+            'measured_at' => 'sometimes|date|before_or_equal:+1 day',
+        ]);
+        $user = $request->user();
+        $w = Weight::where('user_id', $user->id)->findOrFail($weight);
+
+        if (array_key_exists('value_kg', $d)) {
+            $w->value_kg = $d['value_kg'];
+        }
+        if (array_key_exists('measured_at', $d)) {
+            $at = Carbon::parse($d['measured_at']);
+            $w->measured_at = $at;
+            $w->measured_on = $at->copy()->setTimezone($user->timezone ?: 'UTC')->toDateString();
+        }
+        $w->save();
+
+        return response()->json(['data' => $w]);
+    }
+
+    public function destroyWeight(Request $request, string $weight): JsonResponse
+    {        Weight::where('user_id', $request->user()->id)->findOrFail($weight)->delete();
 
         return response()->json(null, 204);
     }

@@ -31,6 +31,7 @@ class ExerciseSeeder extends Seeder
                 'equipment' => $row['equipment'],
                 'movement_pattern' => $row['pattern'],
                 'exercise_type' => $row['type'] ?? 'weighted',
+                'slug' => config('training.exercise_slugs')[$row['name']] ?? null,
                 'is_public' => true,
             ];
 

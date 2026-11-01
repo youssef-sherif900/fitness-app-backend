@@ -47,6 +47,25 @@ class TargetService
             return null;
         }
 
-        return $this->store($user, $this->compute($user), 'auto', $reason);
+        $macros = $this->compute($user);
+        $current = $user->currentTarget();
+
+        // Recalculating without a change must not add a history entry that says nothing changed.
+        if ($current && $current->source === 'auto' && $this->sameMacros($current, $macros)) {
+            return $current;
+        }
+
+        return $this->store($user, $macros, 'auto', $reason);
+    }
+
+    private function sameMacros(Target $target, array $macros): bool
+    {
+        foreach (['kcal', 'protein_g', 'carbs_g', 'fat_g'] as $key) {
+            if ((int) $target->{$key} !== (int) $macros[$key]) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

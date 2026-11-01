@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\LogController;
 use App\Http\Controllers\Api\MeController;
 use App\Http\Controllers\Api\NutritionController;
+use App\Http\Controllers\Api\SavedMealController;
 use App\Http\Controllers\Api\ExerciseController;
 use App\Http\Controllers\Api\ProgramController;
 use App\Http\Controllers\Api\ProgressionController;
@@ -49,10 +50,18 @@ Route::prefix('v1')->group(function () {
         Route::get('nutrition/targets', [NutritionController::class, 'history']);
         Route::post('nutrition/targets/recalculate', [NutritionController::class, 'recalculate']);
 
+        Route::get('nutrition/saved-meals', [SavedMealController::class, 'index']);
+        Route::post('nutrition/saved-meals', [SavedMealController::class, 'store']);
+        Route::get('nutrition/saved-meals/{savedMeal}', [SavedMealController::class, 'show']);
+        Route::patch('nutrition/saved-meals/{savedMeal}', [SavedMealController::class, 'update']);
+        Route::delete('nutrition/saved-meals/{savedMeal}', [SavedMealController::class, 'destroy']);
+
         Route::get('foods', [FoodController::class, 'index']);
+        Route::get('foods/popular', [FoodController::class, 'popular']);
         Route::get('foods/barcode/{code}', [FoodController::class, 'barcode']);
         Route::post('foods', [FoodController::class, 'store']);
         Route::get('foods/{food}', [FoodController::class, 'show']);
+        Route::patch('foods/{food}', [FoodController::class, 'update']);
         Route::post('foods/{food}/report', [FoodController::class, 'report']);
 
         Route::get('logs', [LogController::class, 'index']);
@@ -64,6 +73,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('body/weights', [BodyController::class, 'weights']);
         Route::post('body/weights', [BodyController::class, 'storeWeight']);
+        Route::patch('body/weights/{weight}', [BodyController::class, 'updateWeight']);
         Route::delete('body/weights/{weight}', [BodyController::class, 'destroyWeight']);
 
         Route::post('attachments', [AttachmentController::class, 'store'])->middleware('throttle:uploads');

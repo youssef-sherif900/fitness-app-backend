@@ -31,8 +31,17 @@ class ProfileTargetsTest extends ApiTestCase
         $this->assertDatabaseCount('targets', 0);
     }
 
-    public function test_recalculation_never_overwrites_trainer_managed_targets(): void
+    public function test_recalculating_without_a_change_adds_no_history_entry(): void
     {
+        $u = $this->client();
+        $this->as($u)->putJson('/api/v1/me/profile', self::PROFILE)->assertOk();
+        $this->assertSame(1, Target::where('user_id', $u->id)->count());
+
+        $this->as($u)->postJson('/api/v1/nutrition/targets/recalculate')->assertOk();
+        $this->assertSame(1, Target::where('user_id', $u->id)->count());
+    }
+
+    public function test_recalculation_never_overwrites_trainer_managed_targets(): void    {
         $u = $this->client();
         $this->as($u)->putJson('/api/v1/me/profile', self::PROFILE)->assertOk();
         Target::create(['user_id' => $u->id, 'kcal' => 2500, 'protein_g' => 180, 'carbs_g' => 250, 'fat_g' => 80,
